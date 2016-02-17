@@ -1,0 +1,28 @@
+{% extends "ersa_base.html" %}
+
+{% block title %}{{ title }}{% endblock %}
+{% block content_title %}<h1>{{ title }}</h1>{% endblock %}
+{% block content %}
+
+<h2>You can create, update and view these stuff</h2>
+
+<h3>Create</h3>
+<div class="well">
+    <p>Some stuff depends on others, so certain order has to be followed. For example: <code>RelationshipType --> Relationship</code></p>
+<ul>
+{% for thing in things %}
+  <li><a href="{% url 'creation-forms' thing %}">{{ thing }}</a></li>
+{% endfor %}
+</ul>
+</div>
+
+<h3>View</h3>
+<div class="well">
+<ul>
+{% for thing in things %}
+  <li><a href="{% url 'objects' thing %}">{{ thing }}</a></li>
+{% endfor %}
+</ul>
+</div>
+
+{% endblock %}

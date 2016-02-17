@@ -1,0 +1,46 @@
+[
+  {
+    "model": "bman.relationshiptype",
+    "fields": {
+      "name": "Organisation",
+      "entity_head": "organisation",
+      "entity_tail": "organisation",
+      "description": "For structure of organisations. e.g. University and its faculties, schools",
+      "forward": "is the parent organisation of",
+      "backward": "is a sub-organisation of"
+    }
+  },
+  {
+    "model": "bman.relationshiptype",
+    "fields": {
+      "name": "Employment",
+      "description": "For organisation and persons in paid relationship",
+      "entity_tail": "organisation",
+      "entity_head": "person",
+      "forward": "employs",
+      "backward": "works for"
+    }
+  },
+  {
+    "model": "bman.relationshiptype",
+    "fields": {
+      "name": "Study",
+      "description": "For institution and students",
+      "entity_tail": "organisation",
+      "entity_head": "person",
+      "forward": "educates",
+      "backward": "studies in"
+    }
+  },
+  {
+    "model": "bman.relationshiptype",
+    "fields": {
+      "name": "Supervision",
+      "description": "For person supervises persons for a degree",
+      "entity_tail": "person",
+      "entity_head": "person",
+      "forward": "supervises",
+      "backward": "studies from"
+    }
+  }
+]

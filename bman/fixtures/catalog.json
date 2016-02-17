@@ -1,0 +1,1 @@
+[{"fields": {"description": "Supercomputer, clusters in the cloud", "site": "https://www.ersa.edu.au/service/hpc/", "name": "HPC"}, "model": "bman.catalog", "pk": 1}, {"fields": {"description": "Storage and access of datasets of all sizes", "site": "https://www.ersa.edu.au/service/data-storage/", "name": "Storage"}, "model": "bman.catalog", "pk": 2}]
