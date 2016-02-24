@@ -37,8 +37,8 @@
     "fields": {
       "name": "Supervision",
       "description": "For person supervises persons for a degree",
-      "entity_tail": "person",
-      "entity_head": "person",
+      "entity_tail": "role",
+      "entity_head": "role",
       "forward": "supervises",
       "backward": "studies from"
     }

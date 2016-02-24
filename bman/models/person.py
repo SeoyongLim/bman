@@ -1,9 +1,11 @@
 from django.db import models
+from django.db.models import Q
 
 from django.core import validators
 
 from .organisation import Organisation
-from .relationship import RelationshipType
+from .relationship import RelationshipType, Relationship
+from .utils import get_related
 
 class Person(models.Model):
     TITLE = (('Dr', 'Dr'), ('APro', 'Associate Professor'), ('Prof', 'Professor'),
@@ -53,12 +55,6 @@ class Role(models.Model):
     email = models.EmailField('email address')
     phone = models.CharField(max_length=30, blank=True, default='')
     mobile = models.CharField(max_length=30, blank=True, default='')
-    # not used yet: from Insigtly
-    #~ street = models.CharField(max_length=30, blank=True, default='')
-    #~ suburb = models.CharField(max_length=30, blank=True, default='')
-    #~ state = models.CharField(max_length=30, blank=True, default='')
-    #~ postcode = models.CharField(max_length=30, blank=True, default='')
-    #~ country = models.CharField(max_length=30, blank=True, default='')
 
     class Meta:
         ordering = ['relationshiptype']
@@ -80,6 +76,24 @@ class Role(models.Model):
         services.extend(self.rds_set.all())
         services.extend(self.nectar_set.all())
         return services
+
+    def get_students(self):
+        #Only empolyee can be a supervisor
+        students = []
+        if self.relationshiptype.name == 'Employment':
+            sup_type = RelationshipType.objects.get(name='Supervision')
+            student_rels = Relationship.objects.filter(relationshiptype=sup_type, tail_id=self.pk)
+            students = [ Role.objects.get(pk=rel.head_id).person for rel in student_rels ]
+        return students
+
+    def get_supervisors(self):
+        #Only student can have supervisors
+        supervisors = []
+        if self.relationshiptype.name == 'Study':
+            sup_type = RelationshipType.objects.get(name='Supervision')
+            supervisor_rels = Relationship.objects.filter(relationshiptype=sup_type, head_id=self.pk)
+            supervisors = [ Role.objects.get(pk=rel.tail_id).person for rel in supervisor_rels ]
+        return supervisors
 
 
 class Account(models.Model):

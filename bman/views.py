@@ -17,6 +17,8 @@ from django.core import serializers
 
 from .forms import *
 
+FORM_MODULE_NAME = __name__.split('.')[0] + '.forms'
+
 def get_classes(module_name):
     """Get a list of classes in a module"""
     #Currently used in creating a white list of form class which can be shown throgh generic view
@@ -26,39 +28,46 @@ def get_classes(module_name):
             classes.append(name)
     return classes
 
-def short_form_name(fullname):
-    return fullname.lower().replace('form','')
+# Utility functions to convert to and from XXXForm class names to Model names
+def _form_to_model(fullname):
+    return fullname.lower().replace('form','').capitalize()
 
-def nomalise_form_name(target):
+def _nomalise_form_name(target):
     return target.capitalize() + 'Form'
 
 def index(request):
-    things = get_classes('bman.forms')
-    for i in range(len(things)):
-        things[i] = short_form_name(things[i])
+    # Use form classes to define a list of what can be seen
+    things = [_form_to_model(thing) for thing in get_classes(FORM_MODULE_NAME)]
     return render(request, "startup.html", context={'title':'Welcome', 'things': things})
+
 
 #This is for very generic views for quick development
 class SkeletonView(View):
-    """Base skeleton view based on some built-in criteria with general methods for mixins"""
-    allowed_classess = get_classes('bman.forms') #Only models have form can be interacted with
-    dispatch_kwargs = None
-    form_class = None
-    context = {
-        'title': 'Very generic form',
-        'form': None,
-    }
+    """Base skeleton view based on some built-in criteria with general methods for mixins
+    """
 
-    def dispatch(self, *args, **kwargs):
-        form_to_load = nomalise_form_name(kwargs['target'])
+    # Except dispatch, other functions in Django are defined in ContextMixin
+    allowed_classess = get_classes(FORM_MODULE_NAME) #Only models have form can be interacted with
+    dispatch_kwargs = None
+    dispatch_args = None
+    form_class = None
+
+    def dispatch(self, request, *args, **kwargs):
+        to_be_loaded = _nomalise_form_name(kwargs['target'])
         self.dispatch_kwargs = kwargs #Other extended classes may need this
-        print("Dispatch method called from %s for : " % self.__class__.__name__, form_to_load)
-        if form_to_load in self.allowed_classess:
-            self.form_class = getattr(sys.modules['bman.forms'], form_to_load)
-            self.context['title'] = form_to_load.replace('Form','')
-            return super(SkeletonView, self).dispatch(*args, **kwargs)
+        self.dispatch_args = request.GET
+        print("Dispatch method called from %s for : " % self.__class__.__name__, to_be_loaded)
+        if to_be_loaded in self.allowed_classess:
+            self.form_class = getattr(sys.modules[FORM_MODULE_NAME], to_be_loaded)
+            return super(SkeletonView, self).dispatch(request, *args, **kwargs)
         else:
             return HttpResponseBadRequest("Bad request - out of range")
+
+    def get_context_data(self, **kwargs):
+        context = super(SkeletonView, self).get_context_data(**kwargs)
+        context['title'] = context['object_name'] = _form_to_model(self.form_class.__name__)
+        context['opts'] = self.dispatch_args
+        return context
 
     def get_object(self):
         instance = None
@@ -70,7 +79,7 @@ class SkeletonView(View):
                 raise Http404("Object does not exist")
         else:
             #Never should be here
-            print("No id, what to do?")
+            raise RuntimeError("No id, check code and url config")
         return instance
 
     def get_queryset(self):
@@ -78,18 +87,27 @@ class SkeletonView(View):
         return model.objects.all()
 
     def get_success_url(self):
-        target = short_form_name(self.form_class.__name__)
+        target = _form_to_model(self.form_class.__name__)
         return reverse('objects', kwargs={'target': target})
+
 
 class FormsCreateView(SkeletonView, CreateView):
     template_name = 'generic_form.html'
 
+
 class FormsUpdateView(SkeletonView, UpdateView):
     template_name = 'generic_form.html'
+
 
 class ObjectsView(SkeletonView, DetailView):
     """View class for reading object or objects"""
     template_name = 'generic_detail.html'
+    TEMPLATES = {'Person': 'person_detail.html',
+                 'Organisation': 'organisation_detail.html'}
+
+    def get_template_names(self):
+        return self.TEMPLATES.get(_form_to_model(self.form_class.__name__), self.template_name)
+
 
 class ObjectList(SkeletonView, ListView):
     """View class for reading object or objects"""

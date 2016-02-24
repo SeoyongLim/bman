@@ -1,0 +1,12 @@
+{% for org_id, value in org_tree.items %}
+<li>
+    <a href="{% url 'object' 'organisation' org_id %}">{{ value.name }}</a>
+    {% if 'children' in value %}
+        <ul>
+        {% with org_tree=value.children %}
+            {% include 'organisation_link.html' %}
+        {% endwith %}
+        </ul>
+    {% endif %}
+</li>
+{%endfor%}

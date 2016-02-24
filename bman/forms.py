@@ -41,7 +41,7 @@ class CatalogForm(ModelForm):
         model = Catalog
         fields = '__all__'
 
-class AccessForm(ModelForm):
+class AccessserviceForm(ModelForm):
     class Meta:
         model = AccessService
         fields = '__all__'

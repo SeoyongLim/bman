@@ -1,0 +1,58 @@
+{% extends "ersa_base.html" %}
+
+{% block title %}{{ title }}{% endblock %}
+{% block content_title %}<h1>{{ title }} details</h1>{% endblock %}
+{% block content %}
+
+<div>
+    <h3>Basic information</h3>
+    <p>{{ object.title }} {{ object.full_name }}</p>
+    <a href="https://googleapps.insight.ly/Contacts/Details/{{object.insightly_id}}">See on Insightly</a>
+    <p>{{ object.description }}</p>
+    <a href="{% url 'update-forms' 'person'  object.pk %}">Edit</a>
+</div>
+
+<div>
+    <h3>Roles</h3>
+    <ul>
+    {% for role in object.role_set.all %}
+        <li><a href="{% url 'object' 'organisation' role.organisation.pk %}">{{ role.organisation }}</a> - {{ role.relationshiptype.name }}
+            <a href="{% url 'update-forms' 'role'  role.pk %}">Edit</a>
+       {% with linked=role.get_supervisors %}
+        {% if linked %}
+        <li><h4>Supervisors</h4>
+            <ul>
+            {% for link in linked %}
+                <li><a href="{% url 'object' 'person' link.pk %}">{{ link }}</a></li>
+            {% endfor %}
+            </ul>
+        </li>
+        {% endif %}
+       {% endwith %}
+       {% with linked=role.get_students %}
+        {% if linked %}
+        <li><h4>Students</h4>
+            <ul>
+            {% for link in linked %}
+                <li><a href="{% url 'object' 'person' link.pk %}">{{ link }}</a></li>
+            {% endfor %}
+            </ul>
+        </li>
+        {% endif %}
+       {% endwith %}
+        </li>
+    {% endfor %}
+    </ul>
+
+</div>
+
+<div>
+    <h3>Services</h3>
+    <ul>
+    {% for service in object.get_all_services %}
+        <li><a href="{% url 'object' service.service_url_name service.pk %}">{{ service.descriptive_name }}</a></li>
+    {% endfor %}
+    </ul>
+</div>
+
+{% endblock %}

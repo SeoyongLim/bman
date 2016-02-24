@@ -44,6 +44,15 @@ class BasicService(models.Model):
     class Meta:
         abstract = True
 
+    @property
+    def descriptive_name(self):
+        #May change to another property: summary, or long_name, verbose_name. Cannot use name
+        raise NotImplementedError()
+
+    @property
+    def service_url_name(self):
+        """Used for building reverse url under /object/ when it is not the main object"""
+        return self.__class__.__name__
 
 class AccessService(BasicService):
     """Services only need a name"""
@@ -51,6 +60,9 @@ class AccessService(BasicService):
 
     def __str__(self):
         return "%s has access to %s" % (self.contractor.person, self.catalog)
+
+    def descriptive_name(self):
+        return self.catalog.name
 
 
 class RDS(BasicService):
@@ -62,13 +74,17 @@ class RDS(BasicService):
     def __str__(self):
         return "%s manages %s" % (self.contractor.person, self.allocation_num)
 
+    def descriptive_name(self):
+        return 'RDS'
 
-class Nectar(models.Model):
+class Nectar(BasicService):
     """Provide tracking to Nectar projects"""
-    contractor = models.ForeignKey(Role)
     keystone_id = models.CharField(max_length=100)
     tennant = models.CharField(help_text='Nectar project name', max_length=100, blank=True, default='')
     tennant_id = models.CharField(max_length=32)
 
     def __str__(self):
         return "%s (%s) is bound to %s" % (self.tennant, self.tennant_id, self.contractor.person)
+
+    def descriptive_name(self):
+        return 'Nectar'

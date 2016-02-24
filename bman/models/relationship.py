@@ -28,6 +28,7 @@ class RelationshipType(models.Model):
     def __str__(self):
         return "%s: %s and %s. \n\tforward: %s,\n\tbackward: %s" % (self.name, self.entity_tail, self.entity_head, self.forward, self.backward)
 
+
 class RelationshipManager(models.Manager):
     def create(self, **kwargs):
         """Accept relationshiptype instance or name when creating"""
@@ -47,6 +48,7 @@ class RelationshipManager(models.Manager):
 
         values = {'relationshiptype': rel_type, 'tail_id': kwargs['tail_id'], 'head_id': kwargs['head_id']}
         return super(RelationshipManager, self).create(**values)
+
 
 #May valid if tail and head objects exist
 class Relationship(models.Model):
@@ -80,3 +82,19 @@ class Relationship(models.Model):
             return "%s %s %s" % (tail, r.forward, head)
         else:
             return "%s %s %s" % (head, r.backward, tail)
+
+    @classmethod
+    def as_end(cls, rel_type, entity, end='tail'):
+        # Name is not the best
+        """Check if there are instances of Relationship of an entity at the query
+           end of a RelationshipType. Default is the instance at the tail end.
+
+           rel_type can either be the name string of RelationshipType or an instance.
+        """
+        if isinstance(rel_type, str):
+            rel_type = RelationshipType.objects.get(name=rel_type)
+
+        if end == 'head':
+            return Relationship.objects.filter(relationshiptype=rel_type, head_id=entity.pk)
+        else:
+            return Relationship.objects.filter(relationshiptype=rel_type, tail_id=entity.pk)

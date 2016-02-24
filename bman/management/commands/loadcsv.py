@@ -207,7 +207,7 @@ def _apply_organisation_relationship(orgs):
 def _csv_to_organisations(csv_row_dict):
     orgs = []
     for col in ORGANISATION_COLS:
-        if csv_row_dict[col]:
+        if csv_row_dict[col].strip():
             org, _ = Organisation.objects.get_or_create(name=csv_row_dict[col])
             orgs.append(org)
     _apply_organisation_relationship(orgs)
@@ -250,6 +250,7 @@ import re
 FIRST_NAME = re.compile(r"^[A-Z][ \'\w-]+$")
 LAST_NAME = re.compile(r"^[A-Za-z][ \'\w-]+$")
 
+SUPERVISOR_TYPE = RelationshipType.objects.get(name='Employment')
 def _csv_to_supervisor(csv_row_dict, student):
     #Supervisor column is full of free text, so be picky
     supervisor_cell = csv_row_dict['Supervisor']
@@ -262,12 +263,16 @@ def _csv_to_supervisor(csv_row_dict, student):
             # If there are more than one Person has the same name, get will fail to retrive as it expects ONLY one
             # check Employment role?
             supervisor, _ = Person.objects.get_or_create(first_name=first_name, last_name=last_name)
-            rel_type = RelationshipType.objects.get(name='Supervision')
-            Relationship.objects.get_or_create(relationshiptype=rel_type, tail_id=supervisor.pk, head_id=student.pk)
+            try:
+                employee = supervisor.role_set.get(relationshiptype=SUPERVISOR_TYPE)
+                rel_type = RelationshipType.objects.get(name='Supervision')
+                Relationship.objects.get_or_create(relationshiptype=rel_type, tail_id=employee.pk, head_id=student.pk)
+            except Exception as e:
+                raise ValueError('Cannot find a suitable supervisor in empolyment relationship with an organisation. Error: %s' % str(e))
         else:
             raise ValueError('First or last name of supervisor does not meet the standard')
-    except Exception:
-        raise FieldDoesNotExist('Cannot create or use %s as supervisor for %s.' % (supervisor_cell, str(student)))
+    except Exception as e:
+        raise FieldDoesNotExist('Cannot create or use %s as supervisor for %s. \n\t%s' % (supervisor_cell, student.person.full_name, str(e)))
 
 KEYSTONEID = re.compile(r"^[a-z]+\.[a-z]+$")
 ALLOCATION_NUM = re.compile(r"[A-Z]+[0-9]+")
@@ -298,6 +303,7 @@ def _load(fn):
 
       access_services = {'HPC': Catalog.objects.get(name='HPC'),
                           'STORAGE': Catalog.objects.get(name='Storage')}
+      cache = []
       for row in rows:
         try:
             orgs = _csv_to_organisations(row)
@@ -305,7 +311,15 @@ def _load(fn):
             role = _csv_to_role(row, person, orgs[-1])
             _csv_to_services(row, role, access_services)
             _csv_to_account(row, role)
-            _csv_to_supervisor(row, person)
+            cache.append((row, role))
+        except Exception as e:
+            print(e)
+            print('Insightly_ID=%(Insightly ID)s, email=%(Email Address)s, name=%(Full Name)s, username=%(Username)s\n' % row)
+
+      #After all persons have been loaded, try to hook up with supervisor
+      for row, role in cache:
+        try:
+            _csv_to_supervisor(row, role)
         except Exception as e:
             print(e)
             print('Insightly_ID=%(Insightly ID)s, email=%(Email Address)s, name=%(Full Name)s, username=%(Username)s\n' % row)
