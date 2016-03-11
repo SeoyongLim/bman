@@ -135,7 +135,17 @@ class ApiObjectsView(SkeletonView):
                 data = json.dumps({})
         else:
             data = serializers.serialize('json', self.get_queryset())
-        return HttpResponse(data,  content_type="application/json")
+        # reporting front end is running on other server not from this one.
+        # Has to allow CROS until other solution comes up
+        #return HttpResponse(data,  content_type="application/json")
+        response = HttpResponse(data,  content_type="application/json")
+        # Origin can be limited once I know the origin
+        response["Access-Control-Allow-Origin"] = "*"
+        # Other options are not used but kept here for record
+        #~ response["Access-Control-Allow-Methods"] = "GET, OPTIONS"
+        #~ response["Access-Control-Max-Age"] = "1000"
+        #~ response["Access-Control-Allow-Headers"] = "*"
+        return response
 
     #For creation
     def post(self, request, *args, **kwargs):
