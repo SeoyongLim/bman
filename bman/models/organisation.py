@@ -104,13 +104,28 @@ class Organisation(models.Model):
         return get_tree_leaves(self.get_child_ids(), Organisation.objects.get)
 
     def get_all_services(self):
-        """All services this Person linked to"""
-        from .person import Account
-        accounts = Account.objects.all().filter(billing_org__pk=self.pk)
+        """Get all services this Organisation uses"""
+        accounts = self.get_all_accounts()
         services = []
         for account in accounts:
             services.extend(account.role.get_all_services())
         return services
+
+    def get_all_accounts(self):
+        """Get all accounts this Organisation pays"""
+        from .person import Account
+        return Account.objects.all().filter(billing_org__pk=self.pk)
+
+    def get_extented_accounts(self):
+        """Similar to get_all_accounts but for reporting-frontend as a temporary solution"""
+        accounts = self.get_all_accounts()
+        extended = {}
+        for account in accounts:
+            extended[account.username] = dict(
+               fullname=account.role.person.full_name,
+               organisation=account.role.organisation.name,
+               email=account.role.email)
+        return extended
 
     def get_all_roles(self):
         """Get all roles under this organisation"""
@@ -120,3 +135,17 @@ class Organisation(models.Model):
         for child_id in ids:
             roles.extend(Organisation.objects.get(pk=child_id).role_set.all())
         return roles
+
+    @classmethod
+    def get_tops(cls, rel_type_name='Organisation'):
+        """Get top organisations by querying relationship type
+
+           The default relationtype for this query is 'Organisation'
+           which can be replaced if the relationship fixture is not used
+        """
+        from .relationship import Relationship
+        ids = Relationship.tail_only(rel_type_name)
+        if len(ids):
+            return Organisation.objects.filter(id__in=ids)
+        else:
+            return [] #this may need some check for consistence

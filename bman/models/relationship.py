@@ -84,17 +84,41 @@ class Relationship(models.Model):
             return "%s %s %s" % (head, r.backward, tail)
 
     @classmethod
+    def _ensure_type(cls, rel_type):
+        """
+           Ensure no matter either query argument is a string of the name of a
+           RelationshipType or an instance, returns an instance of RelationshipType.
+        """
+        if isinstance(rel_type, str):
+            rel_type = RelationshipType.objects.get(name=rel_type)
+        return rel_type
+
+    @classmethod
     def as_end(cls, rel_type, entity, end='tail'):
         # Name is not the best
-        """Check if there are instances of Relationship of an entity at the query
+        """Get a list of instances which are linked to a query entity at one
            end of a RelationshipType. Default is the instance at the tail end.
 
            rel_type can either be the name string of RelationshipType or an instance.
         """
-        if isinstance(rel_type, str):
-            rel_type = RelationshipType.objects.get(name=rel_type)
-
+        rel_type = cls._ensure_type(rel_type)
         if end == 'head':
             return Relationship.objects.filter(relationshiptype=rel_type, head_id=entity.pk)
         else:
             return Relationship.objects.filter(relationshiptype=rel_type, tail_id=entity.pk)
+
+    @classmethod
+    def tail_only(cls, rel_type):
+        """Get tail end entities when the relationship they are in cannot distinguish entity type
+           between tail and head. One example is Organisation relationshiptype which has both
+           ends are Organisation.
+
+           This is used to get a list of very top entities of a relationship.
+
+           rel_type can either be the name string of RelationshipType or an instance.
+        """
+        #select distinct tail_id from bman_relationship where relationshiptype_id=1 and tail_id not in (select head_id from bman_relationship where relationshiptype_id=1);
+        rel_type = cls._ensure_type(rel_type)
+        return  Relationship.objects.filter(relationshiptype=rel_type) \
+          .exclude(tail_id__in = Relationship.objects.filter(relationshiptype=rel_type).values_list('head_id')) \
+          .distinct().values_list('tail_id', flat=True)

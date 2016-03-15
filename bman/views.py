@@ -14,6 +14,7 @@ from django.http import (
 )
 
 from django.core import serializers
+from django.db.models.query import QuerySet
 
 from .forms import *
 
@@ -21,7 +22,7 @@ FORM_MODULE_NAME = __name__.split('.')[0] + '.forms'
 
 def get_classes(module_name):
     """Get a list of classes in a module"""
-    #Currently used in creating a white list of form class which can be shown throgh generic view
+    # Currently used in creating a white list of form class which can be shown throgh generic view
     classes = []
     for name, obj in inspect.getmembers(sys.modules[module_name]):
         if inspect.isclass(obj) and obj.__module__ == module_name:
@@ -41,21 +42,21 @@ def index(request):
     return render(request, "startup.html", context={'title':'Welcome', 'things': things})
 
 
-#This is for very generic views for quick development
+# This is for very generic views for quick development
 class SkeletonView(View):
     """Base skeleton view based on some built-in criteria with general methods for mixins
     """
 
     # Except dispatch, other functions in Django are defined in ContextMixin
     allowed_classess = get_classes(FORM_MODULE_NAME) #Only models have form can be interacted with
-    dispatch_kwargs = None
-    dispatch_args = None
     form_class = None
 
     def dispatch(self, request, *args, **kwargs):
         to_be_loaded = _nomalise_form_name(kwargs['target'])
-        self.dispatch_kwargs = kwargs #Other extended classes may need this
-        self.dispatch_args = request.GET
+
+        # Save all args in parsed url match and query string.
+        # Key with multiple values will have only one left: q = QueryDict('a=1&a=3&a=5') -> {'a': '5'}
+        self.kwargs.update(request.GET.dict())
         print("Dispatch method called from %s for : " % self.__class__.__name__, to_be_loaded)
         if to_be_loaded in self.allowed_classess:
             self.form_class = getattr(sys.modules[FORM_MODULE_NAME], to_be_loaded)
@@ -66,20 +67,23 @@ class SkeletonView(View):
     def get_context_data(self, **kwargs):
         context = super(SkeletonView, self).get_context_data(**kwargs)
         context['title'] = context['object_name'] = _form_to_model(self.form_class.__name__)
-        context['opts'] = self.dispatch_args
+        context['opts'] = self.kwargs
         return context
 
     def get_object(self):
+        """Works like SingleObjectMixin but not using slug_field, slug_url_kwarg, pk_url_kwarg"""
+        # https://github.com/django/django/blob/master/django/views/generic/detail.py#L22
         instance = None
-        if 'id' in self.dispatch_kwargs:
-            model = self.form_class.Meta.model
-            try:
-                instance = model.objects.get(pk=self.dispatch_kwargs['id'])
-            except model.DoesNotExist:
-                raise Http404("Object does not exist")
-        else:
+        obj_id = self.kwargs.get('id', None)
+        if obj_id is None:
             #Never should be here
             raise RuntimeError("No id, check code and url config")
+
+        model = self.form_class.Meta.model
+        try:
+            instance = model.objects.get(pk=obj_id)
+        except model.DoesNotExist:
+            raise Http404("Object does not exist")
         return instance
 
     def get_queryset(self):
@@ -126,15 +130,27 @@ def object_should_be_saved(obj):
 # Need to be able to handle token for security by extending dispatch.
 class ApiObjectsView(SkeletonView):
     def get(self, request, *args, **kwargs):
-        data = []
-        if 'id' in self.dispatch_kwargs:
-            try:
-                instance = self.get_object()
-                data = serializers.serialize('json', (instance, ))
-            except Http404:
-                data = json.dumps({})
+        # Return value's format is serialized model instance: https://docs.djangoproject.com/en/1.8/topics/serialization/#serialization-formats-json
+        # TODO: investigate if this format is efficient
+        data = json.dumps({})
+
+        if len(self.kwargs) > 1: #more than just :target
+            if 'id' in self.kwargs:
+                # Get instance of that model
+                query_target = self.get_object()
+            else:
+                # Get model class
+                query_target = self.form_class.Meta.model
+            if 'method' in self.kwargs:
+                method_data = getattr(query_target, self.kwargs['method'])()
+                if isinstance(method_data, QuerySet):
+                    data = serializers.serialize('json', method_data)
+                else:
+                    data = json.dumps(method_data)
         else:
+            # all objects of a model class
             data = serializers.serialize('json', self.get_queryset())
+
         # reporting front end is running on other server not from this one.
         # Has to allow CROS until other solution comes up
         #return HttpResponse(data,  content_type="application/json")
@@ -149,7 +165,7 @@ class ApiObjectsView(SkeletonView):
 
     #For creation
     def post(self, request, *args, **kwargs):
-        if 'id' in self.dispatch_kwargs:
+        if 'id' in self.kwargs:
             return JsonResponse({'message': 'id cannot be used with POST method'}, status=405)
 
         print(request.META['CONTENT_TYPE'])
@@ -172,13 +188,13 @@ class ApiObjectsView(SkeletonView):
 
     # delete and put currently only support single object
     def delete(self, request, *args, **kwargs):
-        if 'id' in self.dispatch_kwargs:
+        if 'id' in self.kwargs:
             return JsonResponse({'result': 'deletion result is coming'})
         else:
             return JsonResponse({'message': 'Missing id'}, status=400)
 
     def put(self, request, *args, **kwargs):
-        if 'id' in self.dispatch_kwargs:
+        if 'id' in self.kwargs:
             #print(QueryDict(request.body))
             print(json.loads(request.body.decode("utf-8")))
             return JsonResponse({'result': 'put result is coming'})

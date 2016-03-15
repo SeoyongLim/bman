@@ -19,6 +19,16 @@ class OrganisationTestCase(TestCase):
         uofa = Organisation.objects.get(name="University of Adelaide")
         self.assertIsInstance(uofa, Organisation)
 
+    def test_get_tops(self):
+        rel_type = RelationshipType.objects.create(name='Organisation',
+            entity_tail = 'organisation',
+            entity_head = 'organisation',
+            forward='is the parent organisation of',
+            backward='is a sub-organisation of')
+        Organisation.objects.create(name="A School of University of Adelaide")
+        Relationship.objects.create(tail_id=1, head_id=2, relationshiptype=rel_type)
+        self.assertEqual(len(Organisation.get_tops()), 1)
+
 class RelationshipTypeTestCase(TestCase):
     def test_validations(self):
         ins = dict(name='Employment',
